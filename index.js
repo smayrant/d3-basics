@@ -19,38 +19,48 @@ const graph = svg.append('g')
 const xAxisGroup = graph.append('g')
     // the x axis group is moved to the bottom of the graph
     .attr('transform', `translate(0, ${graphHeight})`)
-const yAxisGroup = graph.append('g');
 
-// retrieve data from Firestore DB
-db.collection('dishes').get().then(res => {
-    let data = [];
-    res.docs.forEach(doc => {
-        data.push(doc.data())
-    })
-    // create a linear scale for the y - axis
-    const y = d3.scaleLinear()
-        .domain([0, d3.max(data, d => d.orders)])
-        .range([graphHeight, 0]);
+// select text from the x axis group and rotate it -40deg using the text anchor as the end instead of the default middle
+xAxisGroup.selectAll('text')
+    .attr('fill', 'orange')
+    .attr('transform', 'rotate(-40)')
+    .attr('text-anchor', 'end');
 
-    const min = d3.min(data, d => d.orders)
-    const max = d3.max(data, d => d.orders)
+const yAxisGroup = graph.append('g')
 
-    // create a band scale
-    const x = d3.scaleBand()
-        .domain(data.map(item => item.name))
-        .range([0, 500])
-        .paddingInner(0.2)
-        .paddingOuter(0.2)
+// scales 
+const y = d3.scaleLinear()
+    .range([graphHeight, 0]);
+
+const x = d3.scaleBand()
+    .range([0, 500])
+    .paddingInner(0.2)
+    .paddingOuter(0.2)
+
+// create the axes
+const xAxis = d3.axisBottom(x);
+const yAxis = d3.axisLeft(y)
+    .ticks(5)
+    .tickFormat(d => d + ' orders');
+
+// update function
+const update = (data) => {
+
+    // update scale domains
+    y.domain([0, d3.max(data, d => d.orders)]);
+    x.domain(data.map(item => item.name));
 
     //  join the data to the rects
     const rects = graph.selectAll('rect')
         .data(data)
 
-    // update rects currently in the DOM
+    // remove exit selection
+    rects.exit().remove();
+
+    // add attrs to rects already in the DOM
     rects.attr('width', x.bandwidth)
-        .attr('height', d => graphHeight - y(d.orders))
+        .attr("height", d => graphHeight - y(d.orders))
         .attr('fill', 'orange')
-        // ensures the rects have space in between
         .attr('x', d => x(d.name))
         .attr('y', d => y(d.orders));
 
@@ -58,24 +68,44 @@ db.collection('dishes').get().then(res => {
     rects.enter()
         .append('rect')
         .attr('width', x.bandwidth)
-        .attr('height', d => graphHeight - y(d.orders))
+        .attr('height', 0)
         .attr('fill', 'orange')
         // ensures the rects have space in between
         .attr('x', d => x(d.name))
-        .attr('y', d => y(d.orders));
-
-    // create the axes
-    const xAxis = d3.axisBottom(x);
-    const yAxis = d3.axisLeft(y)
-        .ticks(5)
-        .tickFormat(d => d + ' orders');
-
+        .attr('y', graphHeight)
+        .transition().duration(800)
+        .attr('y', d => y(d.orders))
+        .attr('height', d => graphHeight - y(d.orders))
     // call the axes
     xAxisGroup.call(xAxis);
     yAxisGroup.call(yAxis);
+};
 
-    // select text from the x axis group and rotate it -40deg using the text anchor as the end instead of the default middle
-    xAxisGroup.selectAll('text')
-        .attr('transform', 'rotate(-40)')
-        .attr('text-anchor', 'end')
-})
+let data = [];
+// retrieve data from Firestore DB
+db.collection('dishes').onSnapshot(res => {
+    res.docChanges().forEach(change => {
+
+        const doc = { ...change.doc.data(), id: change.doc.id };
+
+        switch (change.type) {
+            case 'added':
+                data.push(doc);
+                break;
+
+            case 'modified':
+                const index = data.findIndex(item => item.id == doc.id);
+                data[index] = doc;
+                break;
+
+            case 'removed':
+                data = data.filter(item => item.id !== doc.id);
+                break;
+            default:
+                break;
+        }
+    });
+
+    update(data)
+
+});  
