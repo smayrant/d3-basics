@@ -43,6 +43,8 @@ const yAxis = d3.axisLeft(y)
     .ticks(5)
     .tickFormat(d => d + ' orders');
 
+const t = d3.transition().duration(800);
+
 // update function
 const update = (data) => {
 
@@ -59,10 +61,11 @@ const update = (data) => {
 
     // add attrs to rects already in the DOM
     rects.attr('width', x.bandwidth)
-        .attr("height", d => graphHeight - y(d.orders))
         .attr('fill', 'orange')
         .attr('x', d => x(d.name))
-        .attr('y', d => y(d.orders));
+    // .transition(t)
+    // .attr("height", d => graphHeight - y(d.orders))
+    // .attr('y', d => y(d.orders));
 
     // append the enter selection to the DOM
     rects.enter()
@@ -73,7 +76,8 @@ const update = (data) => {
         // ensures the rects have space in between
         .attr('x', d => x(d.name))
         .attr('y', graphHeight)
-        .transition().duration(800)
+        .merge(rects)
+        .transition(t)
         .attr('y', d => y(d.orders))
         .attr('height', d => graphHeight - y(d.orders))
     // call the axes
@@ -108,4 +112,11 @@ db.collection('dishes').onSnapshot(res => {
 
     update(data)
 
-});  
+});
+
+// Tween
+const widthTween = (d) => {
+
+    // define interpolation
+    // d3.interpolate returns a function which we call 'i'
+}
